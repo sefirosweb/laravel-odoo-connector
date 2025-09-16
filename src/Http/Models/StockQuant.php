@@ -14,4 +14,9 @@ class StockQuant extends OdooModel
     {
         return $this->belongsTo(ProductProduct::class, 'product_id');
     }
+
+    public function stock_location(): BelongsTo
+    {
+        return $this->belongsTo(StockLocation::class, 'location_id');
+    }
 }
