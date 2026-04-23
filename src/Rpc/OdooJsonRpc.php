@@ -11,7 +11,7 @@ class OdooJsonRpc
 {
     private static $id = 0;
     private static $instance;
-    public $conections = [];
+    public $connections = [];
 
     public function __construct() {}
 
@@ -26,11 +26,11 @@ class OdooJsonRpc
     private static function get_connection($connection = 'odoo'): OdooUserLogin
     {
         $instance = self::get_instance();
-        if (isset($instance->conections[$connection])) {
-            return $instance->conections[$connection];
+        if (isset($instance->connections[$connection])) {
+            return $instance->connections[$connection];
         }
 
-        $instance->conections[$connection] = new OdooUserLogin(
+        $instance->connections[$connection] = new OdooUserLogin(
             config('database.connections.' . $connection . '.host'),
             config('database.connections.' . $connection . '.database'),
             config('database.connections.' . $connection . '.username'),
@@ -38,7 +38,7 @@ class OdooJsonRpc
             config('database.connections.' . $connection . '.defaultOptions', [])
         );
 
-        return $instance->conections[$connection];
+        return $instance->connections[$connection];
     }
 
     public static function execute_kw($model, $operation, $args = [], $kwargs = [], $connection = 'odoo')

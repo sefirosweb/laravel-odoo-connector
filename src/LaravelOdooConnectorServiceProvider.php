@@ -25,8 +25,8 @@ class LaravelOdooConnectorServiceProvider extends ServiceProvider
             __DIR__ . '/config/config.php' => config_path('laravel-odoo-connector.php'),
         ], 'config');
 
-        DB::extend('odoo', function ($config, $conection) {
-            $config['conection'] = $conection;
+        DB::extend('odoo', function ($config, $connection) {
+            $config['connection_name'] = $connection;
             return (new OdooConnector)->connect($config);
         });
     }

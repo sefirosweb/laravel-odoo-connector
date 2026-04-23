@@ -16,7 +16,7 @@ class OdooConnection extends Connection
             $query['operation'],
             $query['params'],
             $query['object'],
-            $this->config['conection']
+            $this->config['connection_name']
         );
 
         return $data;
@@ -29,7 +29,7 @@ class OdooConnection extends Connection
             $query['operation'],
             $query['params'],
             $query['object'],
-            $this->config['conection']
+            $this->config['connection_name']
         );
 
         return $data;
@@ -42,7 +42,7 @@ class OdooConnection extends Connection
             $query['operation'],
             $query['params'],
             $query['object'],
-            $this->config['conection']
+            $this->config['connection_name']
         );
 
         return $data;
@@ -55,7 +55,7 @@ class OdooConnection extends Connection
             $query['operation'],
             $query['params'],
             $query['object'],
-            $this->config['conection']
+            $this->config['connection_name']
         );
 
         return $data;
