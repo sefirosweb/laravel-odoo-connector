@@ -1,182 +1,227 @@
-# laravel-odoo-connector
+# Laravel Odoo Connector
 
-Driver to connect Odoo using ORM of laravel, it is based in JSON RPC. 
+Use Laravel's Eloquent ORM against an [Odoo](https://www.odoo.com/) instance, through Odoo's JSON-RPC API.
 
-[Odoo Web Services Documentation JSON RPC](https://www.odoo.com/documentation/master/developer/howtos/web_services.html).
+Reference: [Odoo Web Services Documentation (JSON-RPC)](https://www.odoo.com/documentation/master/developer/howtos/web_services.html).
 
-## Why use laravel-odoo-connector instead a postgresql connection?
-It seems that it is easier to connect directly to the postgres database instead of using laravel-odoo-connector (based on json-rpc)
+## Why JSON-RPC instead of a raw PostgreSQL connection?
 
-The advantage is that when you execute actions like "modify" or "create" objects, odoo has triggers that fire automated actions,
+Connecting Laravel directly to Odoo's Postgres database is simpler on paper but bypasses Odoo's business logic. Every time Odoo's ORM handles a write it runs a chain of Python-side triggers — invoice generation, stock moves, mail activities, etc. — that a raw SQL `INSERT` will silently skip.
 
-If you execute this in a raw postgress statement these events / actions will not be executed, so it is important to follow the odoo workflow, and odoo provides us with json-rpc to be able to perform these actions,
+This package goes through Odoo's JSON-RPC layer so those side effects still fire. It also lets you call **model actions** (the equivalent of clicking a button in the Odoo UI), which is impossible from raw SQL:
 
-For example you could have a trigger in odoo that sends the invoice to the client when it is created,
-
-Also laravel-odoo-connector provides the ability to execute model "actions",
-
-For example once the SaleOrder is created it can be confirmed
 ```php
-$sale_order = SaleOrder::find(1);
-$sale_order->action('action_confirm');
-```
-It triggers the button "confirm" in the [odoo model](https://github.com/odoo/odoo/blob/a80f9a4be4c4da8980067d1ba9beca53b431f83b/addons/sale/models/sale_order.py#L918)
-
-## Installation - Composer
-
-You can install the package via composer:
-
-```
-composer require sefirosweb/laravel-odoo-connector
+$saleOrder = SaleOrder::find(1);
+$saleOrder->action('action_confirm');
+// Triggers the "Confirm" button on sale.order — see Odoo's sale/models/sale_order.py
 ```
 
-## Add in database.php the configuration for odoo
+## Requirements
+
+- PHP `^8.2`
+- Laravel `^12.0`
+- An Odoo instance with JSON-RPC access enabled and valid credentials (username + API key or password).
+
+## Installation
+
+```bash
+composer require sefirosweb/laravel-odoo-connector:^12.0
+```
+
+The service provider auto-registers via Laravel's package discovery and registers an `odoo` driver on Laravel's connection manager.
+
+## Configuration
+
+### 1. Declare the connection in `config/database.php`
+
 ```php
-// database.php
-    'connections' => [
-        // ...
-
-        'odoo' => [
-            'driver' => 'odoo',
-            'host' => env('ODOO_HOST', 'https://your-odoo-host.com'),
-            'database' => env('ODOO_DB', 'db_name'),
-            'username' => env('ODOO_USERNAME', 'user'),
-            'password' => env('ODOO_PASSWORD', 'api_key'),
-            'defaultOptions' => [
-                'timeout' => 20,
-                'context' => [
-                    'lang' => 'es_ES'
-                ],
+'connections' => [
+    // ...
+    'odoo' => [
+        'driver'   => 'odoo',
+        'host'     => env('ODOO_HOST',     'https://your-odoo-host.com'),
+        'database' => env('ODOO_DB',       'db_name'),
+        'username' => env('ODOO_USERNAME', 'user'),
+        'password' => env('ODOO_PASSWORD', 'api_key'),
+        'defaultOptions' => [
+            'timeout' => 20,
+            'context' => [
+                'lang' => 'es_ES',
             ],
         ],
-
     ],
+],
 ```
+
+And in `.env`:
+
+```dotenv
+ODOO_HOST=https://your-odoo-host.com
+ODOO_DB=db_name
+ODOO_USERNAME=user
+ODOO_PASSWORD=api_key
+```
+
+### 2. (Optional) Publish the config to override shipped models
+
+```bash
+php artisan vendor:publish --provider="Sefirosweb\LaravelOdooConnector\LaravelOdooConnectorServiceProvider" --tag=config --force
+```
+
+Then in `config/laravel-odoo-connector.php`:
+
+```php
+return [
+    'ProductProduct'  => App\Odoo\CustomProductProduct::class,
+    'ProductTemplate' => Sefirosweb\LaravelOdooConnector\Http\Models\ProductTemplate::class,
+    'ResLang'         => Sefirosweb\LaravelOdooConnector\Http\Models\ResLang::class,
+    // ...
+];
+```
+
+Every model in the package resolves related classes through this config, so replacing `ProductProduct` here propagates to any relation that targets it.
+
+### 3. Test the connection
+
+```bash
+php artisan test:odoo
+```
+
+This runs a smoke test that fetches the first `MrpProduction` and dumps its `mrp_immediate_production_lines` relation. It's a quick way to verify auth + connectivity.
 
 ## Usage
 
-Import the models of odoo in your controller
+### Basic Eloquent
+
+The shipped models under `Sefirosweb\LaravelOdooConnector\Http\Models\*` cover the most common Odoo models (product, mrp, sale, purchase, stock, mail, etc.). Use them like any Eloquent model:
 
 ```php
 use Sefirosweb\LaravelOdooConnector\Http\Models\ProductProduct;
 
-class YourController extends Controller
-{
-    public function index()
-    {
-        $products = ProductProduct::where('name', 'like', '%product%')->with('mrp_bom')->get();
-        return view('products.index', compact('products'));
-    }
-}
-```
+$products = ProductProduct::where('name', 'like', '%widget%')
+    ->with('mrp_bom')
+    ->get();
 
-You can use all methods of Eloquent ORM, like `find`, `where`, `whereHas`, `with`, `create`, `update`, `delete`, etc.
-
-```php
 $product = ProductProduct::find(1);
 $product->name = 'New name';
 $product->save();
 
-$product = ProductProduct::create([
-    'name' => 'Product 1',
-    'description' => 'Description of product 1',
-    'list_price' => 100,
-    // ...
+$created = ProductProduct::create([
+    'name'        => 'Product X',
+    'description' => 'Flagship SKU',
+    'list_price'  => 100,
 ]);
 ```
 
-## Customize your models
-A lot of times you need to modify the models or create new ones, publish the config file and extends the models and,
+Supported Eloquent methods include `find`, `where`, `whereHas`, `with`, `create`, `update`, `delete`, `get`, `first`, etc.
+
+### Customising a model
+
+Extend the shipped model and register your override through the config:
 
 ```php
-class YourCustomProductProduct extends Sefirosweb\LaravelOdooConnector\Http\Models\ProductProduct
+namespace App\Odoo;
+
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Sefirosweb\LaravelOdooConnector\Http\Models\ProductProduct as BaseProductProduct;
+
+class CustomProductProduct extends BaseProductProduct
 {
     protected $table = 'product.product';
 
-    public function your_custom_belongs(): BelongTo
+    public function our_custom_belongs(): BelongsTo
     {
-        return $this->belongsTo(YourCustomModel::class, 'your_field_id');
+        return $this->belongsTo(OurCustomModel::class, 'our_field_id');
     }
 }
 ```
 
+Then point `config/laravel-odoo-connector.php:ProductProduct` at `App\Odoo\CustomProductProduct::class`.
 
-### Publish config, to make override of Odoo Models
+### Soft-deletes (the Odoo `active` flag)
 
-```bash
-php artisan vendor:publish --provider="Sefirosweb\LaravelOdooConnector\LaravelOdooConnectorServiceProvider"  --tag=config --force
-```
-
-With that you can add more relations or edit them, configure your own models, in the file `config/laravel-odoo-connector.php`
+Odoo's equivalent of a soft-delete is the `active` boolean column. Mirror it with the shipped trait:
 
 ```php
-
-return [
-    'ProductProduct' => App\Http\Models\YourCustomProductProduct::class,
-    'ProductTemplate' => Sefirosweb\LaravelOdooConnector\Http\Models\ProductTemplate::class,
-    'ResLang' => Sefirosweb\LaravelOdooConnector\Http\Models\ResLang::class,
-    ///...
-];
-
-```
-
-### SoftDelete
-If you need to use soft delete "active" import the trait Sefirosweb\LaravelOdooConnector\Http\Traits\SoftDeleteOdoo
-
-```php
+use Sefirosweb\LaravelOdooConnector\Http\Models\OdooModel;
 use Sefirosweb\LaravelOdooConnector\Http\Traits\SoftDeleteOdoo;
 
-class ProductProduct extends OdooModel
+class MyModel extends OdooModel
 {
     use SoftDeleteOdoo;
     // ...
 }
 ```
 
-## Multiple Odoo Connections
-Add in database.php the configuration for odoo, only add connection in the model
+### Fetching large collections
+
+Odoo JSON-RPC times out on unbounded queries. Use `get_all` to chunk automatically (500 records per batch by default):
+
+```php
+$products = ProductProduct::get_all('id', 'name', 100);
+// Behaves like ::all() but paginates under the hood.
+```
+
+### Model actions (Odoo server-side buttons)
+
+Trigger the equivalent of a UI button:
+
+```php
+$saleOrder = SaleOrder::find(1);
+$saleOrder->action('action_confirm');
+```
+
+Pass extra arguments when the action needs them:
+
+```php
+$args = [[['id' => 1]]];
+SaleOrder::model_action('action_custom', $args);
+```
+
+### Multiple Odoo connections
+
+Define multiple `odoo` connections in `config/database.php` and target one from a model:
 
 ```php
 use Sefirosweb\LaravelOdooConnector\Http\Models\OdooModel;
 
-class YourMainOdooModel extends OdooModel
+class SecondaryOdooModel extends OdooModel
 {
-    protected $connection = 'other_odoo_connection';
+    protected $connection = 'other_odoo';
 
     public function getConnection()
     {
-        return app('db')->connection('other_odoo_connection');
+        return app('db')->connection('other_odoo');
     }
 }
 ```
 
-## Custom get all records
-If you need to get all records, you can use the method `get_all` in the model, this is execute in chunks of 500 records to avoid odoo timeout, is same has `all` method of Eloquent ORM
+## Testing
 
-```php
-$products = ProductProduct::get_all('id', 'name', 100);
+```bash
+composer install
+./vendor/bin/phpunit
 ```
 
-## Model Actions
-You can execute actions of the model, for example, confirm a sale order
+The Orchestra Testbench suite currently covers the service provider boot and the `DB::extend('odoo', …)` driver registration.
 
-```php
-$sale_order = SaleOrder::find(1);
-$sale_order->action('action_confirm');
+> ⚠️ Full integration testing against a real Odoo instance is not shipped here because it requires network access to an Odoo server. Expand the suite with your own tests pointed at a staging Odoo when you need coverage of specific models.
+
+When working from the [laravel-test](https://github.com/sefirosweb/laravel-test) harness with Sail:
+
+```bash
+docker exec -w /var/www/html/packages/laravel-odoo-connector laravel-test-laravel.test-1 ./vendor/bin/phpunit
 ```
 
-For custom actions you can provide more data;
+## Roadmap
 
-```php
-$args = [['id' => 1]];
-SaleOrder::model_action('action_custom', $args);
-```
+- Add the remaining Odoo models (POS, payroll, etc.).
+- Cover more methods with tests once a public-facing Odoo test instance is available.
 
-## TODOS
- * Add the rest of models of Odoo (pos, pos_line...)
- * Add tests
+## Versioning
 
-## Tests:
-```php
-php artisan test packages/laravel-odoo-connector/tests/Feature/RandomTests.php
-```
+Major versions are aligned with Laravel majors (`12.x`, `11.x`, `9.x` …). See the root [CLAUDE.md](https://github.com/sefirosweb/laravel-test/blob/12.0/CLAUDE.md) of the test harness for the full policy.
+
+## License
+
+MIT.
