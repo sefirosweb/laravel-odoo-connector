@@ -14,9 +14,9 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Sefirosweb\LaravelOdooConnector\Database\OdooEloquentBuilder;
-use Sefirosweb\LaravelOdooConnector\Database\Relelations\BelongsTo;
-use Sefirosweb\LaravelOdooConnector\Database\Relelations\BelongsToMany;
-use Sefirosweb\LaravelOdooConnector\Database\Relelations\HasMany;
+use Sefirosweb\LaravelOdooConnector\Database\Relations\BelongsTo;
+use Sefirosweb\LaravelOdooConnector\Database\Relations\BelongsToMany;
+use Sefirosweb\LaravelOdooConnector\Database\Relations\HasMany;
 
 use Sefirosweb\LaravelOdooConnector\Rpc\OdooJsonRpc;
 

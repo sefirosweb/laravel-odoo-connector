@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Sefirosweb\LaravelOdooConnector\Database\Relelations;
+namespace Sefirosweb\LaravelOdooConnector\Database\Relations;
 
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\BelongsTo as BaseBelongsTo;
