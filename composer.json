@@ -8,6 +8,11 @@
             "Sefirosweb\\LaravelOdooConnector\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "Sefirosweb\\LaravelOdooConnector\\Tests\\": "tests/"
+        }
+    },
     "authors": [
         {
             "name": "Sefirosweb",
@@ -15,6 +20,17 @@
         }
     ],
     "minimum-stability": "dev",
+    "require": {
+        "php": "^8.2",
+        "laravel/framework": "^12.0"
+    },
+    "require-dev": {
+        "orchestra/testbench": "^10.0",
+        "phpunit/phpunit": "^11.0"
+    },
+    "scripts": {
+        "test": "vendor/bin/phpunit"
+    },
     "extra": {
         "laravel": {
             "providers": [
