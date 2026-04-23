@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [12.0.2] - 2026-04-23
+
+### Changed
+- **Renamed `Database\Relelations\` namespace to `Database\Relations\`** (typo fix). The three shipped relation overrides — `BelongsTo`, `BelongsToMany`, `HasMany` — have been moved and their class namespaces corrected. Their content, methods and inheritance are unchanged.
+  - **Breaking change** for any consumer whose code has `use Sefirosweb\LaravelOdooConnector\Database\Relelations\…`. These classes are internal driver plumbing — Laravel resolves them automatically via `OdooModel::newBelongsTo()` / `newHasMany()` / `newBelongsToMany()` whenever user code calls the standard `$this->belongsTo(...)` / `$this->hasMany(...)` on an `OdooModel` subclass — so normal consumer code does not import them.
+  - **Fix if you hit a missing-class error**: replace `Database\Relelations\` with `Database\Relations\` in your `use` statements.
+  - No backward-compatibility `class_alias()` was registered: the maintenance cost of carrying it until v13.x outweighed the near-zero probability of an external direct import.
+
 ## [12.0.1] - 2026-04-23
 
 ### Added
