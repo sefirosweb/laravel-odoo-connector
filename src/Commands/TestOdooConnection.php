@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace Sefirosweb\LaravelOdooConnector\Commands;
 
 use Illuminate\Console\Command;
-use Sefirosweb\LaravelOdooConnector\Http\Models\MrpImmediateProductionLine;
 use Sefirosweb\LaravelOdooConnector\Http\Models\MrpProduction;
-use Sefirosweb\LaravelOdooConnector\Http\Models\ProductProduct;
-use Sefirosweb\LaravelOdooConnector\Http\Models\SaleOrder;
+use Throwable;
 
 class TestOdooConnection extends Command
 {
@@ -24,33 +22,26 @@ class TestOdooConnection extends Command
      *
      * @var string
      */
-    protected $description = 'Run test odoo connection';
+    protected $description = 'Smoke-test the configured Odoo JSON-RPC connection';
 
-    /**
-     * Create a new command instance.
-     *
-     * @return void
-     */
-    public function __construct()
+    public function handle(): int
     {
-        parent::__construct();
-    }
-
-    /**
-     * Execute the console command.
-     *
-     * @return int
-     */
-    public function handle()
-    {
-
-        $a = MrpProduction::first()->mrp_immediate_production_lines;
-        if (!$a) {
-            $this->error('No data found');
+        try {
+            $production = MrpProduction::select('id', 'name')->first();
+        } catch (Throwable $e) {
+            $this->error('Odoo connection failed: ' . $e->getMessage());
             return Command::FAILURE;
         }
 
-        dd($a->toArray());
+        if ($production === null) {
+            $this->warn('Connection OK but no mrp.production records found.');
+            return Command::SUCCESS;
+        }
+
+        $this->info('Odoo connection OK.');
+        $this->line('First mrp.production id:   ' . $production->id);
+        $this->line('First mrp.production name: ' . var_export($production->name, true));
+
         return Command::SUCCESS;
     }
 }

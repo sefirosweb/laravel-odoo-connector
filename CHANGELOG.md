@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [12.0.3] - 2026-04-23
+
+### Fixed
+- **`test:odoo` artisan command**: removed the leftover `dd($a->toArray())` that killed the PHP process before `handle()` could return its exit code. The command now prints a readable status banner via `$this->info()` / `$this->line()` / `$this->warn()` / `$this->error()` and returns a proper exit code (0 on success, 1 on failure, 0-with-warning when connection OK but no `mrp.production` rows exist).
+- The command now handles `MrpProduction::first()` returning `null` gracefully instead of calling `->mrp_immediate_production_lines` on null.
+
+### Changed
+- `TestOdooConnection::handle()` now has an explicit `: int` return type.
+- Removed three unused imports (`MrpImmediateProductionLine`, `ProductProduct`, `SaleOrder`).
+
+### Added
+- `tests/Integration/TestOdooConnectionCommandTest.php` — 3 tests: command is registered, exits 0 against real Odoo, prints a banner.
+
 ## [12.0.2] - 2026-04-23
 
 ### Changed
