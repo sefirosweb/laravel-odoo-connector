@@ -7,6 +7,7 @@ namespace Sefirosweb\LaravelOdooConnector\Database;
 use Illuminate\Database\Connection;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Database\Query\Grammars\Grammar as BaseGrammar;
+use Sefirosweb\LaravelOdooConnector\Exceptions\OdooUnsupportedOperationException;
 
 class OdooGrammar extends BaseGrammar
 {
@@ -162,8 +163,26 @@ class OdooGrammar extends BaseGrammar
                         $filters = array_merge($filters, $nestedFilters);
                     }
                     continue 2; // Skip the default case
+                case 'Exists':
+                case 'NotExists':
+                    throw new OdooUnsupportedOperationException(sprintf(
+                        "whereHas() / has() / doesntHave() are not supported by the Odoo JSON-RPC driver "
+                        . "(tried to compile a '%s' clause on model '%s'). "
+                        . "Odoo's domain filter language has no correlated-subquery equivalent. "
+                        . "Workaround: resolve related IDs first and pass them to whereIn(), e.g. "
+                        . "\$orderIds = SaleOrderLine::where('product_id', \$productId)->pluck('order_id'); "
+                        . "SaleOrder::whereIn('id', \$orderIds)->get();",
+                        $where['type'],
+                        $query->from,
+                    ));
                 default:
-                    throw new \Exception("Unsupported where type: " . $where['type']);
+                    throw new OdooUnsupportedOperationException(sprintf(
+                        "Unsupported where clause of type '%s' on model '%s'. "
+                        . "The Odoo JSON-RPC driver can only compile flat filter expressions "
+                        . "(the Basic / In / NotIn / Nested / Null / NotNull types).",
+                        $where['type'],
+                        $query->from,
+                    ));
             }
 
             if ($where['boolean'] === 'or') {

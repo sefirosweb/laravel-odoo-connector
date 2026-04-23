@@ -5,8 +5,18 @@
          colors="true"
          cacheDirectory=".phpunit.cache">
     <testsuites>
+        <!-- Fast, offline suites: no external dependencies. Always run. -->
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
+        </testsuite>
+
+        <!--
+            Integration suite: hits a real Odoo instance over JSON-RPC.
+            Tests skip automatically when ODOO_HOST / ODOO_DB / ODOO_USERNAME /
+            ODOO_PASSWORD are not set in the environment. See README for setup.
+        -->
+        <testsuite name="Integration">
+            <directory>tests/Integration</directory>
         </testsuite>
     </testsuites>
     <source>

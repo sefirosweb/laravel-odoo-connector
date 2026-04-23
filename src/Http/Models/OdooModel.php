@@ -27,7 +27,7 @@ class OdooModel extends Model
 
     public function getConnection()
     {
-        return app('db')->connection('odoo');
+        return app('db')->connection($this->getConnectionName());
     }
 
     /**

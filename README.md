@@ -113,7 +113,33 @@ $created = ProductProduct::create([
 ]);
 ```
 
-Supported Eloquent methods include `find`, `where`, `whereHas`, `with`, `create`, `update`, `delete`, `get`, `first`, etc.
+Supported Eloquent methods include `find`, `where`, `whereIn`, `whereNotIn`, `whereNull`, `whereNotNull`, `with`, `create`, `update`, `delete`, `get`, `first`, `limit`, `offset`, `orderBy`, etc.
+
+### Known limitations
+
+Odoo's domain filter language is more restrictive than SQL, so a few Eloquent primitives cannot be translated:
+
+- **`whereHas()` / `has()` / `whereDoesntHave()`** — these compile to a correlated `EXISTS` subquery which Odoo cannot express. The driver throws `OdooUnsupportedOperationException` with an actionable message pointing you at the workaround: resolve the related ids first and pass them to `whereIn()`:
+
+  ```php
+  // ❌ Will throw OdooUnsupportedOperationException
+  $orders = SaleOrder::whereHas('sale_order_lines')->get();
+
+  // ✅ Two-step pattern that works
+  $orderIds = SaleOrderLine::select('order_id')->pluck('order_id');
+  $orders   = SaleOrder::whereIn('id', $orderIds)->get();
+  ```
+
+- **many2one fields are returned as `[id, display_name]` tuples**, not plain ids. This is how Odoo JSON-RPC serialises them and the driver does not unwrap them for you. If you need just the id, access `[0]`:
+
+  ```php
+  $line = SaleOrderLine::first();
+  $orderId = is_array($line->order_id) ? $line->order_id[0] : $line->order_id;
+  ```
+
+- **Empty char / text fields come back as `false`**, not `null` / `""`. Another Odoo serialisation quirk; check with `=== false` when that matters.
+
+- **`between`, `whereDate`, `whereYear`, raw SQL expressions** and other where types that require SQL-side evaluation will also throw `OdooUnsupportedOperationException` at compile time.
 
 ### Customising a model
 
@@ -188,35 +214,68 @@ use Sefirosweb\LaravelOdooConnector\Http\Models\OdooModel;
 class SecondaryOdooModel extends OdooModel
 {
     protected $connection = 'other_odoo';
-
-    public function getConnection()
-    {
-        return app('db')->connection('other_odoo');
-    }
 }
+```
+
+Or run a one-off query against a named connection:
+
+```php
+ProductProduct::on('other_odoo')->where(...)->get();
 ```
 
 ## Testing
 
+The test suite is split in two:
+
+- **`Feature`** — offline smoke tests (service provider boot, `DB::extend('odoo', …)` registration). Always run; no external dependencies.
+- **`Integration`** — hit a real Odoo instance over JSON-RPC. Cover authentication, `ResPartner`, `ProductProduct`, `SaleOrder` + relations, `PurchaseOrder`, and the actionable error paths (`whereHas` / bad credentials). Auto-skip when the `ODOO_*` environment variables are not set.
+
+### Run the offline suite only
+
 ```bash
 composer install
+./vendor/bin/phpunit --testsuite Feature
+```
+
+### Run the integration suite
+
+Set the four required variables in your shell or load them from a local `.env.testing`:
+
+```bash
+export ODOO_HOST=https://your-odoo-staging.example
+export ODOO_DB=odoo_staging
+export ODOO_USERNAME=integration-tests@example.com
+export ODOO_PASSWORD=your-api-key
+# Optional:
+export ODOO_TIMEOUT=20
+export ODOO_LANG=en_US
+
+./vendor/bin/phpunit --testsuite Integration
+```
+
+Integration tests are **read-only** — they never create, update or delete rows — so they are safe to run against a production-copy Odoo, though a staging instance is preferable.
+
+### Run both suites
+
+```bash
 ./vendor/bin/phpunit
 ```
 
-The Orchestra Testbench suite currently covers the service provider boot and the `DB::extend('odoo', …)` driver registration.
-
-> ⚠️ Full integration testing against a real Odoo instance is not shipped here because it requires network access to an Odoo server. Expand the suite with your own tests pointed at a staging Odoo when you need coverage of specific models.
-
-When working from the [laravel-test](https://github.com/sefirosweb/laravel-test) harness with Sail:
+When working from the [laravel-test](https://github.com/sefirosweb/laravel-test) harness with Sail, pass the env vars through `docker exec`:
 
 ```bash
-docker exec -w /var/www/html/packages/laravel-odoo-connector laravel-test-laravel.test-1 ./vendor/bin/phpunit
+docker exec -w /var/www/html/packages/laravel-odoo-connector \
+  -e ODOO_HOST=$ODOO_HOST \
+  -e ODOO_DB=$ODOO_DB \
+  -e ODOO_USERNAME=$ODOO_USERNAME \
+  -e ODOO_PASSWORD=$ODOO_PASSWORD \
+  laravel-test-laravel.test-1 ./vendor/bin/phpunit
 ```
 
 ## Roadmap
 
-- Add the remaining Odoo models (POS, payroll, etc.).
-- Cover more methods with tests once a public-facing Odoo test instance is available.
+- Add the remaining Odoo models that individual projects depend on (custom Odoo installs vary per client, so the package ships only the "standard" models).
+- Optionally auto-unwrap many2one tuples to plain ids inside `OdooProcessor` (would change the public contract, so gated behind a config flag).
 
 ## Versioning
 
