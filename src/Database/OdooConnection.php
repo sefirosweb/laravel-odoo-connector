@@ -9,7 +9,12 @@ use Sefirosweb\LaravelOdooConnector\Rpc\OdooJsonRpc;
 
 class OdooConnection extends Connection
 {
-    public function select($query, $bindings = [], $useReadPdo = true)
+    /**
+     * Odoo driver: $query is a JSON-RPC payload compiled by OdooGrammar, not SQL.
+     *
+     * @param  array{model: string, operation: string, params: array, object: array}  $query
+     */
+    public function select($query, $bindings = [], $useReadPdo = true, array $fetchUsing = [])
     {
         $data = OdooJsonRpc::execute_kw(
             $query['model'],
@@ -22,6 +27,9 @@ class OdooConnection extends Connection
         return $data;
     }
 
+    /**
+     * @param  array{model: string, operation: string, params: array, object: array}  $query
+     */
     public function insert($query, $bindings = [])
     {
         $data = OdooJsonRpc::execute_kw(
@@ -35,6 +43,9 @@ class OdooConnection extends Connection
         return $data;
     }
 
+    /**
+     * @param  array{model: string, operation: string, params: array, object: array}  $query
+     */
     public function update($query, $bindings = [])
     {
         $data = OdooJsonRpc::execute_kw(
@@ -48,6 +59,9 @@ class OdooConnection extends Connection
         return $data;
     }
 
+    /**
+     * @param  array{model: string, operation: string, params: array, object: array}  $query
+     */
     public function delete($query, $bindings = [])
     {
         $data = OdooJsonRpc::execute_kw(
